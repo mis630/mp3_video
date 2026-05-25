@@ -10,7 +10,8 @@
     "clipboardRead"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://api.cobalt.tools/*"
   ],
   "action": {
     "default_popup": "popup.html",

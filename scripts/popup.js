@@ -320,8 +320,8 @@ async function handleDownload(type) {
       throw new Error(response.error || 'Download failed. Please try again.');
     }
     
-    // Show success feedback
-    showDownloadSuccess(type);
+    // Show success feedback - download opened in new tab
+    showDownloadSuccess(type, response.message);
     
   } catch (error) {
     console.error('Download error:', error);
@@ -333,7 +333,7 @@ async function handleDownload(type) {
 }
 
 // Show download success feedback
-function showDownloadSuccess(type) {
+function showDownloadSuccess(type, message = 'Download started!') {
   const btn = type === 'video' ? elements.downloadVideoBtn : elements.downloadAudioBtn;
   const originalContent = btn.innerHTML;
   
@@ -341,12 +341,16 @@ function showDownloadSuccess(type) {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="20 6 9 17 4 12"/>
     </svg>
-    <span>Downloading...</span>
+    <span>${message}</span>
   `;
+  btn.style.background = '#10b981';
+  btn.style.borderColor = '#10b981';
   
   setTimeout(() => {
     btn.innerHTML = originalContent;
-  }, 2000);
+    btn.style.background = '';
+    btn.style.borderColor = '';
+  }, 3000);
 }
 
 // Load recent downloads

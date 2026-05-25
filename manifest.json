@@ -7,11 +7,11 @@
     "activeTab",
     "downloads",
     "storage",
-    "clipboardRead"
+    "clipboardRead",
+    "tabs"
   ],
   "host_permissions": [
-    "<all_urls>",
-    "https://api.cobalt.tools/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",

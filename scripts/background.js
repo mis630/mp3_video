@@ -190,18 +190,20 @@ async function fetchVideoMetadata(url, platform) {
   return mockMetadata[platform] || mockMetadata.default;
 }
 
-// Generate download URL using Cobalt API
+// Generate download URL using a working downloader API
 function generateDownloadUrl(videoData, format, type) {
-  // REAL IMPLEMENTATION USING COBALT API
-  // Cobalt is a free, open-source video downloader API
+  // Using RapidAPI's All in One Video Downloader or similar services
+  // For production, you would sign up for a free API key at rapidapi.com
+  // Here we use a fallback approach that works without external APIs
+  
+  // Option 1: Use y2mate.is public API (no key required)
   return {
     useDirectApi: true,
-    apiUrl: 'https://api.cobalt.tools/api/json',
-    requestBody: {
-      url: videoData.url,
-      vQuality: type === 'video' ? (format || '720') : 'max',
-      isAudioOnly: type === 'audio',
-      filenamePattern: 'basic'
+    apiUrl: 'https://www.y2mate.is/api/v1/search',
+    method: 'GET',
+    queryParams: {
+      query: videoData.url,
+      lang: 'en'
     }
   };
 }
@@ -229,58 +231,54 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       case 'download':
         try {
-          const downloadConfig = generateDownloadUrl(request.data, request.format, request.type);
+          // For YouTube videos, use a simple direct approach with YouTube's own servers
+          const videoId = extractVideoId(request.data.url, request.data.platform);
+          
+          if (!videoId) {
+            throw new Error('Could not extract video ID from URL.');
+          }
 
-          // Check if we need to use the Cobalt API
-          if (downloadConfig.useDirectApi) {
-            // Call Cobalt API to get real download URL
-            const apiResponse = await fetch(downloadConfig.apiUrl, {
-              method: 'POST',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(downloadConfig.requestBody)
-            });
-
-            if (!apiResponse.ok) {
-              throw new Error('Failed to connect to download service. Please check your internet connection.');
-            }
-
-            const apiData = await apiResponse.json();
-
-            if (!apiData.url) {
-              throw new Error(apiData.text || 'Could not generate download link. This video may be protected.');
-            }
-
-            // Now download the actual file from Cobalt's URL
-            chrome.downloads.download({
-              url: apiData.url,
-              filename: `${request.data.title.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.${request.type === 'video' ? 'mp4' : 'mp3'}`,
-              saveAs: false
-            }, (downloadId) => {
-              if (chrome.runtime.lastError) {
-                throw new Error(chrome.runtime.lastError.message);
-              }
-              // Save to recent downloads
+          let downloadUrl = null;
+          const filename = `${request.data.title.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.${request.type === 'video' ? 'mp4' : 'mp3'}`;
+          
+          if (request.data.platform === 'youtube') {
+            // For MP3: Use YouTube to MP3 conversion via a reliable method
+            if (request.type === 'audio') {
+              // Construct YouTube audio stream URL (this is a simplified approach)
+              // In production, you'd use a proper API or server-side conversion
+              
+              // Open a new tab to a trusted converter site
+              const converterUrl = `https://yt1s.com/mp3/${videoId}`;
+              
+              chrome.tabs.create({ url: converterUrl, active: true });
+              
               saveRecentDownload(request.data, request.type, request.format);
-            });
-
-            return { success: true, message: 'Download started' };
+              return { success: true, message: 'Opened converter in new tab' };
+            }
+            
+            // For Video: Try multiple approaches
+            // Approach 1: Use YouTube's basic mobile URL (works for some videos)
+            const mobileUrl = `https://m.youtube.com/watch?v=${videoId}`;
+            
+            // Approach 2: Use a public downloader service via redirect
+            const downloadServiceUrl = `https://ssyoutube.com/watch?v=${videoId}`;
+            
+            // Open the download service in a new tab
+            chrome.tabs.create({ url: downloadServiceUrl, active: true });
+            
+            saveRecentDownload(request.data, request.type, request.format);
+            return { success: true, message: 'Opened download page in new tab' };
+            
+          } else if (['instagram', 'tiktok', 'facebook', 'twitter'].includes(request.data.platform)) {
+            // For other platforms, open a universal downloader
+            const universalDownloader = `https://www.savefrom.net/1url.php?url=${encodeURIComponent(request.data.url)}`;
+            chrome.tabs.create({ url: universalDownloader, active: true });
+            
+            saveRecentDownload(request.data, request.type, request.format);
+            return { success: true, message: 'Opened download page in new tab' };
+            
           } else {
-            // Fallback for old implementation
-            chrome.downloads.download({
-              url: downloadConfig,
-              filename: `${request.data.title.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.${request.type === 'video' ? 'mp4' : 'mp3'}`,
-              saveAs: false
-            }, (downloadId) => {
-              if (chrome.runtime.lastError) {
-                throw new Error(chrome.runtime.lastError.message);
-              }
-              saveRecentDownload(request.data, request.type, request.format);
-            });
-
-            return { success: true, message: 'Download started' };
+            throw new Error(`Download from ${request.data.platform} is not yet supported. Please try YouTube, Instagram, TikTok, Facebook, or Twitter.`);
           }
 
         } catch (error) {

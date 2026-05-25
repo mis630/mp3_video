@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Video & MP3 Downloader</title>
+  <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" fill="#1DB954"/>
+          <path d="M10 16L14 20L22 12" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h1>Video Downloader</h1>
+      </div>
+      <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+        <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg class="moon-icon hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Input Section -->
+      <div class="input-section">
+        <div class="input-wrapper">
+          <input 
+            type="text" 
+            id="videoUrl" 
+            placeholder="Paste video link here..." 
+            autocomplete="off"
+          >
+          <button class="paste-btn" id="pasteBtn" title="Paste from clipboard">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            </svg>
+          </button>
+        </div>
+        <button class="fetch-btn" id="fetchBtn">
+          <span>Fetch Video</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state hidden" id="loadingState">
+        <div class="spinner"></div>
+        <p>Fetching video information...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state hidden" id="errorState">
+        <div class="error-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <h3>Oops!</h3>
+        <p id="errorMessage">This video cannot be downloaded.</p>
+        <button class="retry-btn" id="retryBtn">Try Again</button>
+      </div>
+
+      <!-- Video Info Card -->
+      <div class="video-card hidden" id="videoCard">
+        <div class="thumbnail-container">
+          <img src="" alt="Video Thumbnail" id="videoThumbnail">
+          <div class="platform-badge" id="platformBadge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            <span id="platformName">YouTube</span>
+          </div>
+        </div>
+        
+        <div class="video-info">
+          <h2 class="video-title" id="videoTitle">Video Title</h2>
+          <p class="video-meta" id="videoMeta">Duration • Views</p>
+        </div>
+
+        <!-- Quality Options -->
+        <div class="quality-section">
+          <h3>Select Quality</h3>
+          <div class="quality-options" id="qualityOptions">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Download Buttons -->
+        <div class="download-actions">
+          <button class="download-btn video-btn" id="downloadVideoBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span>Download Video</span>
+          </button>
+          <button class="download-btn audio-btn" id="downloadAudioBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+            <span>Download MP3</span>
+          </button>
+        </div>
+
+        <!-- File Size Info -->
+        <div class="file-size-info">
+          <span class="size-badge" id="fileSizeBadge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span id="fileSizeText">-- MB</span>
+          </span>
+          <span class="hd-badge" id="hdBadge">HD</span>
+        </div>
+      </div>
+
+      <!-- Recent Downloads -->
+      <div class="recent-section hidden" id="recentSection">
+        <h3>Recent Downloads</h3>
+        <div class="recent-list" id="recentList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="disclaimer">⚠️ Only download content you own or have permission to use.</p>
+      <div class="supported-platforms">
+        <span>Supported:</span>
+        <div class="platform-icons">
+          <span class="platform-icon" title="YouTube">YT</span>
+          <span class="platform-icon" title="Instagram">IG</span>
+          <span class="platform-icon" title="TikTok">TT</span>
+          <span class="platform-icon" title="Facebook">FB</span>
+          <span class="platform-icon" title="Twitter/X">X</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="scripts/popup.js" type="module"></script>
+</body>
+</html>

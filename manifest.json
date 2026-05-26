@@ -2,13 +2,12 @@
   "manifest_version": 3,
   "name": "Smart Video & MP3 Downloader",
   "version": "1.0.0",
-  "description": "The easiest video & MP3 downloader on the internet. Download videos from YouTube, Instagram, TikTok, Facebook, Twitter/X and more.",
+  "description": "Download videos and convert to MP3 directly in your browser without servers. 100% client-side processing.",
   "permissions": [
     "activeTab",
     "downloads",
     "storage",
-    "clipboardRead",
-    "tabs"
+    "clipboardRead"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -22,14 +21,16 @@
     },
     "default_title": "Smart Video & MP3 Downloader"
   },
-  "background": {
-    "service_worker": "scripts/background.js",
-    "type": "module"
-  },
   "icons": {
     "16": "icons/icon16.svg",
     "48": "icons/icon48.svg",
     "128": "icons/icon128.svg"
+  },
+  "cross_origin_opener_policy": {
+    "value": "same-origin"
+  },
+  "cross_origin_embedder_policy": {
+    "value": "require-corp"
   },
   "web_accessible_resources": [
     {

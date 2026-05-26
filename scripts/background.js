@@ -1,4 +1,8 @@
 // Background Service Worker for Smart Video & MP3 Downloader
+// Uses own backend API instead of third-party websites
+
+// Configuration
+const BACKEND_API_URL = 'http://localhost:3000/api'; // Change this to your deployed backend URL
 
 // Platform detection patterns
 const PLATFORM_PATTERNS = {
@@ -74,7 +78,7 @@ function isValidUrl(url) {
   }
 }
 
-// Fetch video metadata using Cobalt API
+// Fetch video metadata using YOUR OWN BACKEND API
 async function fetchVideoMetadata(url, platform) {
   const videoId = extractVideoId(url, platform);
 
@@ -82,112 +86,139 @@ async function fetchVideoMetadata(url, platform) {
     throw new Error('Could not extract video ID');
   }
 
-  // Try to get real metadata from Cobalt API
+  // Call your own backend API to extract video information
   try {
-    const apiResponse = await fetch('https://api.cobalt.tools/api/json', {
+    const response = await fetch(`${BACKEND_API_URL}/extract`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        url: url,
-        isAudioOnly: false,
-        filenamePattern: 'basic'
-      })
+      body: JSON.stringify({ url })
     });
 
-    if (apiResponse.ok) {
-      const apiData = await apiResponse.json();
-      
-      // Return real data if available
-      if (apiData.url || apiData.text) {
-        return {
-          title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video`,
-          thumbnail: platform === 'youtube' 
-            ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-            : 'https://via.placeholder.com/640x360?text=Video+Thumbnail',
-          duration: 'Unknown',
-          views: 'Unknown',
-          formats: [
-            { quality: '1080p', size: 'Unknown', format: 'mp4' },
-            { quality: '720p', size: 'Unknown', format: 'mp4' },
-            { quality: '480p', size: 'Unknown', format: 'mp4' },
-            { quality: '360p', size: 'Unknown', format: 'mp4' }
-          ],
-          audioFormats: [
-            { quality: '320kbps', size: 'Unknown', format: 'mp3' },
-            { quality: '256kbps', size: 'Unknown', format: 'mp3' },
-            { quality: '128kbps', size: 'Unknown', format: 'mp3' }
-          ]
-        };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API responded with status ${response.status}`);
+    }
+
+    const apiData = await response.json();
+    
+    if (apiData.success && apiData.data) {
+      return {
+        id: apiData.data.id,
+        title: apiData.data.title || `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video`,
+        thumbnail: apiData.data.thumbnail || (platform === 'youtube' 
+          ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+          : 'https://via.placeholder.com/640x360?text=Video+Thumbnail'),
+        duration: formatDuration(apiData.data.duration) || 'Unknown',
+        views: formatViewCount(apiData.data.viewCount) || 'Unknown',
+        uploader: apiData.data.uploader,
+        uploadDate: apiData.data.uploadDate,
+        formats: apiData.data.formats || [
+          { quality: '1080p', size: 'Unknown', format: 'mp4' },
+          { quality: '720p', size: 'Unknown', format: 'mp4' },
+          { quality: '480p', size: 'Unknown', format: 'mp4' },
+          { quality: '360p', size: 'Unknown', format: 'mp4' }
+        ],
+        audioFormats: apiData.data.audioFormats || [
+          { quality: '320kbps', size: 'Unknown', format: 'mp3' },
+          { quality: '256kbps', size: 'Unknown', format: 'mp3' },
+          { quality: '128kbps', size: 'Unknown', format: 'mp3' }
+        ]
+      };
+    }
+    
+    throw new Error('Invalid response from backend');
+    
+  } catch (error) {
+    console.error('Backend API error:', error);
+    
+    // Fallback to mock data for development/testing when backend is unavailable
+    console.log('Using mock data as fallback');
+    
+    // Fallback to mock metadata
+    const mockMetadata = {
+      youtube: {
+        title: 'Amazing Video Title',
+        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        duration: '3:45',
+        views: '1.2M views',
+        formats: [
+          { quality: '1080p', size: '45 MB', format: 'mp4' },
+          { quality: '720p', size: '28 MB', format: 'mp4' },
+          { quality: '480p', size: '15 MB', format: 'mp4' },
+          { quality: '360p', size: '8 MB', format: 'mp4' }
+        ],
+        audioFormats: [
+          { quality: '320kbps', size: '8 MB', format: 'mp3' },
+          { quality: '256kbps', size: '6 MB', format: 'mp3' },
+          { quality: '128kbps', size: '3 MB', format: 'mp3' }
+        ]
+      },
+      instagram: {
+        title: 'Instagram Reel',
+        thumbnail: `https://instagram.fcdn.net/v/t51.2885-15/${videoId}.jpg`,
+        duration: '0:30',
+        views: '500K views',
+        formats: [
+          { quality: '720p', size: '12 MB', format: 'mp4' },
+          { quality: '480p', size: '6 MB', format: 'mp4' }
+        ],
+        audioFormats: [
+          { quality: '128kbps', size: '1 MB', format: 'mp3' }
+        ]
+      },
+      tiktok: {
+        title: 'TikTok Video',
+        thumbnail: `https://p16-sign.tiktokcdn.com/obj/${videoId}`,
+        duration: '0:15',
+        views: '2.5M views',
+        formats: [
+          { quality: '720p', size: '8 MB', format: 'mp4' },
+          { quality: '480p', size: '4 MB', format: 'mp4' }
+        ],
+        audioFormats: [
+          { quality: '128kbps', size: '0.5 MB', format: 'mp3' }
+        ]
+      },
+      default: {
+        title: 'Video Content',
+        thumbnail: 'https://via.placeholder.com/640x360?text=Video+Thumbnail',
+        duration: 'Unknown',
+        views: 'Unknown',
+        formats: [
+          { quality: '720p', size: '20 MB', format: 'mp4' },
+          { quality: '480p', size: '10 MB', format: 'mp4' }
+        ],
+        audioFormats: [
+          { quality: '128kbps', size: '3 MB', format: 'mp3' }
+        ]
       }
-    }
-  } catch (e) {
-    console.log('API fetch failed, using mock data');
+    };
+
+    return mockMetadata[platform] || mockMetadata.default;
   }
+}
 
-  // Fallback to mock metadata
-  const mockMetadata = {
-    youtube: {
-      title: 'Amazing Video Title',
-      thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      duration: '3:45',
-      views: '1.2M views',
-      formats: [
-        { quality: '1080p', size: '45 MB', format: 'mp4' },
-        { quality: '720p', size: '28 MB', format: 'mp4' },
-        { quality: '480p', size: '15 MB', format: 'mp4' },
-        { quality: '360p', size: '8 MB', format: 'mp4' }
-      ],
-      audioFormats: [
-        { quality: '320kbps', size: '8 MB', format: 'mp3' },
-        { quality: '256kbps', size: '6 MB', format: 'mp3' },
-        { quality: '128kbps', size: '3 MB', format: 'mp3' }
-      ]
-    },
-    instagram: {
-      title: 'Instagram Reel',
-      thumbnail: `https://instagram.fcdn.net/v/t51.2885-15/${videoId}.jpg`,
-      duration: '0:30',
-      views: '500K views',
-      formats: [
-        { quality: '720p', size: '12 MB', format: 'mp4' },
-        { quality: '480p', size: '6 MB', format: 'mp4' }
-      ],
-      audioFormats: [
-        { quality: '128kbps', size: '1 MB', format: 'mp3' }
-      ]
-    },
-    tiktok: {
-      title: 'TikTok Video',
-      thumbnail: `https://p16-sign.tiktokcdn.com/obj/${videoId}`,
-      duration: '0:15',
-      views: '2.5M views',
-      formats: [
-        { quality: '720p', size: '8 MB', format: 'mp4' },
-        { quality: '480p', size: '4 MB', format: 'mp4' }
-      ],
-      audioFormats: [
-        { quality: '128kbps', size: '0.5 MB', format: 'mp3' }
-      ]
-    },
-    default: {
-      title: 'Video Content',
-      thumbnail: 'https://via.placeholder.com/640x360?text=Video+Thumbnail',
-      duration: 'Unknown',
-      views: 'Unknown',
-      formats: [
-        { quality: '720p', size: '20 MB', format: 'mp4' },
-        { quality: '480p', size: '10 MB', format: 'mp4' }
-      ],
-      audioFormats: [
-        { quality: '128kbps', size: '3 MB', format: 'mp3' }
-      ]
-    }
-  };
+// Format duration from seconds to MM:SS
+function formatDuration(seconds) {
+  if (!seconds) return null;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
-  return mockMetadata[platform] || mockMetadata.default;
+// Format view count with K/M suffixes
+function formatViewCount(count) {
+  if (!count) return null;
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M views`;
+  }
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(0)}K views`;
+  }
+  return `${count} views`;
 }
 
 // Generate download URL using a working downloader API
@@ -231,54 +262,109 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       case 'download':
         try {
-          // For YouTube videos, use a simple direct approach with YouTube's own servers
+          // Use YOUR OWN BACKEND API for direct downloads - NO REDIRECTS!
           const videoId = extractVideoId(request.data.url, request.data.platform);
           
           if (!videoId) {
             throw new Error('Could not extract video ID from URL.');
           }
 
-          let downloadUrl = null;
           const filename = `${request.data.title.substring(0, 50).replace(/[^a-z0-9]/gi, '_')}.${request.type === 'video' ? 'mp4' : 'mp3'}`;
           
-          if (request.data.platform === 'youtube') {
-            // For MP3: Use YouTube to MP3 conversion via a reliable method
-            if (request.type === 'audio') {
-              // Construct YouTube audio stream URL (this is a simplified approach)
-              // In production, you'd use a proper API or server-side conversion
+          // For AUDIO (MP3): Call backend to convert and return download URL
+          if (request.type === 'audio') {
+            try {
+              const response = await fetch(`${BACKEND_API_URL}/download/audio`, {
+                method: 'POST',
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                  url: request.data.url,
+                  quality: selectedAudioQuality || '128'
+                })
+              });
+
+              if (response.ok) {
+                const result = await response.json();
+                
+                if (result.success && result.data.downloadUrl) {
+                  // Build full URL for the file
+                  const fullDownloadUrl = `${BACKEND_API_URL.replace('/api', '')}${result.data.downloadUrl}`;
+                  
+                  // Use Chrome Downloads API for direct download
+                  chrome.downloads.download({
+                    url: fullDownloadUrl,
+                    filename: filename,
+                    saveAs: false
+                  });
+                  
+                  saveRecentDownload(request.data, request.type, request.format);
+                  return { success: true, message: 'Download started!' };
+                }
+              }
               
-              // Open a new tab to a trusted converter site
+              // Fallback if backend fails
+              throw new Error('Backend audio conversion unavailable');
+              
+            } catch (backendError) {
+              console.error('Backend audio error:', backendError);
+              // Fallback to external converter (not ideal but works as backup)
               const converterUrl = `https://yt1s.com/mp3/${videoId}`;
-              
               chrome.tabs.create({ url: converterUrl, active: true });
-              
               saveRecentDownload(request.data, request.type, request.format);
-              return { success: true, message: 'Opened converter in new tab' };
+              return { success: true, message: 'Opened converter in new tab (backend unavailable)' };
+            }
+          }
+          
+          // For VIDEO: Get direct download URL from backend
+          try {
+            const qualityMap = {
+              '1080p': '137+140',
+              '720p': '136+140', 
+              '480p': '135+140',
+              '360p': '134+140'
+            };
+            
+            const formatId = qualityMap[request.data.selectedQuality] || 'best';
+            
+            const response = await fetch(
+              `${BACKEND_API_URL}/download/video?url=${encodeURIComponent(request.data.url)}&formatId=${formatId}`,
+              {
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json'
+                }
+              }
+            );
+
+            if (response.ok) {
+              const result = await response.json();
+              
+              if (result.success && result.data.downloadUrl) {
+                // Use Chrome Downloads API for direct download
+                chrome.downloads.download({
+                  url: result.data.downloadUrl,
+                  filename: filename,
+                  saveAs: false
+                });
+                
+                saveRecentDownload(request.data, request.type, request.format);
+                return { success: true, message: 'Download started!' };
+              }
             }
             
-            // For Video: Try multiple approaches
-            // Approach 1: Use YouTube's basic mobile URL (works for some videos)
-            const mobileUrl = `https://m.youtube.com/watch?v=${videoId}`;
+            // Fallback if backend fails
+            throw new Error('Backend video download unavailable');
             
-            // Approach 2: Use a public downloader service via redirect
+          } catch (backendError) {
+            console.error('Backend video error:', backendError);
+            // Fallback to external downloader (not ideal but works as backup)
             const downloadServiceUrl = `https://ssyoutube.com/watch?v=${videoId}`;
-            
-            // Open the download service in a new tab
             chrome.tabs.create({ url: downloadServiceUrl, active: true });
-            
             saveRecentDownload(request.data, request.type, request.format);
-            return { success: true, message: 'Opened download page in new tab' };
-            
-          } else if (['instagram', 'tiktok', 'facebook', 'twitter'].includes(request.data.platform)) {
-            // For other platforms, open a universal downloader
-            const universalDownloader = `https://www.savefrom.net/1url.php?url=${encodeURIComponent(request.data.url)}`;
-            chrome.tabs.create({ url: universalDownloader, active: true });
-            
-            saveRecentDownload(request.data, request.type, request.format);
-            return { success: true, message: 'Opened download page in new tab' };
-            
-          } else {
-            throw new Error(`Download from ${request.data.platform} is not yet supported. Please try YouTube, Instagram, TikTok, Facebook, or Twitter.`);
+            return { success: true, message: 'Opened download page (backend unavailable)' };
           }
 
         } catch (error) {

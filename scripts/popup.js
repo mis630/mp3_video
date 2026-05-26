@@ -1,9 +1,7 @@
 // Popup Script for Smart Video & MP3 Downloader
 // 100% Client-Side Processing with FFmpeg.wasm
 
-const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ log: true });
-
+let ffmpeg = null;
 let directMediaUrl = ""; 
 
 // DOM Elements
@@ -44,16 +42,28 @@ async function handleAnalyze() {
     return;
   }
   
-  showStatus("Analyzing web page for media streams...");
+  showStatus("Analyzing media link...");
+  
+  // For direct .mp4 links, we use the URL directly
+  if (url.match(/\.mp4(\?.*)?$/i)) {
+    directMediaUrl = url;
+    showStatus("Direct video link detected! Ready to process.");
+    videoTitle.textContent = "Video Ready";
+    downloadSection.classList.remove('hidden');
+    return;
+  }
   
   try {
-    // Try to find direct media stream file (.mp4)
-    // For simple sites, fetch the HTML page and look for source tags
-    const response = await fetch(url);
+    // Try to find direct media stream file (.mp4) from HTML page
+    const response = await fetch(url, { 
+      method: 'GET',
+      mode: 'cors'
+    });
     const html = await response.text();
     
-    // Simple regex searching for a hidden video source link inside the page
-    const match = html.match(/src="([^"]+\.mp4[^"]*)"/);
+    // Search for video source links in the page
+    const match = html.match(/src="([^\"]+\.mp4[^\"]*)"/i) || 
+                  html.match(/<source[^>]+src="([^\"]+\.mp4[^\"]*)"/i);
     
     if (match && match[1]) {
       directMediaUrl = match[1];
@@ -61,7 +71,7 @@ async function handleAnalyze() {
       videoTitle.textContent = "Video Detected";
       downloadSection.classList.remove('hidden');
     } else {
-      // Fallback for demo testing if stream is deeply hidden
+      // Fallback: use the URL directly for testing
       directMediaUrl = url; 
       showStatus("Ready to process stream link.");
       videoTitle.textContent = "Video Ready";
@@ -92,7 +102,7 @@ function handleDownloadMp4() {
     if (chrome.runtime.lastError) {
       showStatus("Download failed: " + chrome.runtime.lastError.message);
     } else {
-      showStatus("Download started!");
+      showStatus("Download started! Check your Downloads folder.");
     }
   });
 }
@@ -107,24 +117,30 @@ async function handleDownloadMp3() {
   showStatus("Loading local converter engine (FFmpeg)...");
   
   try {
-    // Load FFmpeg if not already loaded
+    // Initialize FFmpeg.wasm
+    if (!ffmpeg) {
+      const { createFFmpeg, fetchFile } = FFmpeg;
+      ffmpeg = createFFmpeg({ log: true });
+    }
+    
     if (!ffmpeg.isLoaded()) {
       await ffmpeg.load();
     }
     
-    showStatus("Downloading raw media to local memory...");
+    showStatus("Downloading video to browser memory...");
     
-    // Download file into browser virtual memory filesystem
-    ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(directMediaUrl));
+    // Download file into browser virtual filesystem
+    const fileData = await fetchFile(directMediaUrl);
+    ffmpeg.FS('writeFile', 'input.mp4', fileData);
     
-    showStatus("Converting track to MP3 audio... (Please wait)");
+    showStatus("Converting to MP3 audio... (Please wait)");
     
-    // Run real command-line FFmpeg inside Chrome tab
+    // Run FFmpeg conversion inside browser
     await ffmpeg.run('-i', 'input.mp4', '-q:a', '0', '-map', 'a', 'output.mp3');
     
     showStatus("Conversion finished! Saving file...");
     
-    // Read the resulting MP3 file data from memory
+    // Read the resulting MP3 file from memory
     const data = ffmpeg.FS('readFile', 'output.mp3');
     
     // Create blob and trigger download
@@ -139,13 +155,17 @@ async function handleDownloadMp3() {
       if (chrome.runtime.lastError) {
         showStatus("Download failed: " + chrome.runtime.lastError.message);
       } else {
-        showStatus("Download complete!");
+        showStatus("Download complete! Check your Downloads folder.");
       }
     });
     
-    // Cleanup
-    ffmpeg.FS('unlink', 'input.mp4');
-    ffmpeg.FS('unlink', 'output.mp3');
+    // Cleanup memory
+    try {
+      ffmpeg.FS('unlink', 'input.mp4');
+      ffmpeg.FS('unlink', 'output.mp3');
+    } catch (e) {
+      console.warn('Cleanup warning:', e);
+    }
     
   } catch (error) {
     console.error('MP3 conversion error:', error);
